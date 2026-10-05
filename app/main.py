@@ -1,18 +1,21 @@
 from fastapi import FastAPI
 
+from app.config import settings
+
+
 app = FastAPI(
-    title="SecureEdge",
+    title=settings.app_name,
     description="Zero-Trust API Gateway & Policy Enforcement Platform",
-    version="0.1.0",
+    version=settings.app_version,
 )
 
 
 @app.get("/")
 async def root():
     return {
-        "service": "SecureEdge",
+        "service": settings.app_name,
         "status": "running",
-        "version": "0.1.0",
+        "version": settings.app_version,
     }
 
 
