@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -5,9 +6,6 @@ from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.models import User
-from unittest.mock import patch
-
-from fastapi import HTTPException
 
 
 def register_and_login(client, role="user"):
@@ -34,6 +32,7 @@ def register_and_login(client, role="user"):
         try:
             user = db.scalar(select(User).where(User.username == username))
             assert user is not None
+
             user.role = role
             db.commit()
         finally:
@@ -86,13 +85,17 @@ def test_unauthenticated_user_cannot_read_analytics(client):
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "payload"),
+    ("method", "path", "payload", "expected_action"),
     [
-        ("get", "/documents", None),
+        ("get", "/documents", None, "read"),
         (
             "post",
             "/documents",
-            {"title": "Policy test", "content": "Test content"},
+            {
+                "title": "Policy test",
+                "content": "Test content",
+            },
+            "write",
         ),
     ],
 )
@@ -101,6 +104,7 @@ def test_document_routes_reject_policy_denial(
     method,
     path,
     payload,
+    expected_action,
 ):
     headers = register_and_login(client)
 
@@ -124,22 +128,31 @@ def test_document_routes_reject_policy_denial(
     assert response.json()["detail"] == "Test policy denial"
     mock_evaluate.assert_called_once()
 
+    policy_request = mock_evaluate.call_args.args[0]
+    assert policy_request.action == expected_action
+    assert policy_request.resource == "documents"
+
 
 @pytest.mark.parametrize(
-    ("method", "payload"),
+    ("method", "payload", "expected_action"),
     [
-        ("get", None),
+        ("get", None, "read"),
         (
             "put",
-            {"title": "Updated title", "content": "Updated content"},
+            {
+                "title": "Updated title",
+                "content": "Updated content",
+            },
+            "write",
         ),
-        ("delete", None),
+        ("delete", None, "write"),
     ],
 )
 def test_individual_document_routes_reject_policy_denial(
     client,
     method,
     payload,
+    expected_action,
 ):
     headers = register_and_login(client)
 
@@ -152,6 +165,7 @@ def test_individual_document_routes_reject_policy_denial(
             "content": "Original content",
         },
     )
+
     assert create_response.status_code == 201
 
     document_id = create_response.json()["id"]
@@ -176,3 +190,7 @@ def test_individual_document_routes_reject_policy_denial(
     assert response.status_code == 403
     assert response.json()["detail"] == "Test policy denial"
     mock_evaluate.assert_called_once()
+
+    policy_request = mock_evaluate.call_args.args[0]
+    assert policy_request.action == expected_action
+    assert policy_request.resource == "documents"
