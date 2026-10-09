@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_policy
 from app.models import SecureDocument, User
 from app.schemas import DocumentCreate, DocumentResponse, DocumentUpdate
 
@@ -43,7 +43,7 @@ def get_owned_document(
 def create_document(
     document_data: DocumentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_policy("write", "documents")),
 ):
     document = SecureDocument(
         owner_id=current_user.id,
@@ -64,7 +64,7 @@ def create_document(
 )
 def list_documents(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_policy("read", "documents")),
 ):
     statement = (
         select(SecureDocument)
@@ -82,7 +82,7 @@ def list_documents(
 def get_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_policy("read", "documents")),
 ):
     return get_owned_document(document_id, current_user, db)
 
@@ -95,7 +95,7 @@ def update_document(
     document_id: int,
     document_data: DocumentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_policy("write", "documents")),
 ):
     document = get_owned_document(document_id, current_user, db)
 
@@ -115,7 +115,7 @@ def update_document(
 def delete_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_policy("write", "documents")),
 ):
     document = get_owned_document(document_id, current_user, db)
 
