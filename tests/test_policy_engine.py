@@ -1,7 +1,8 @@
-
 import pytest
 
 from app.policy_engine import PolicyEngine, PolicyRequest
+
+from app.authorization import Permission, ROLE_PERMISSIONS
 
 
 @pytest.fixture
@@ -102,3 +103,20 @@ def test_sensitivity_denies_unknown_classification(engine):
         context={"resource_sensitivity": "top-secret"},
     )
     assert decision.allowed is False
+
+
+def test_role_permissions_match_policy_engine():
+    permission_to_action = {
+        Permission.USERS_READ: ("read", "users"),
+        Permission.USERS_WRITE: ("write", "users"),
+        Permission.ANALYTICS_READ: ("read", "analytics"),
+        Permission.ANALYTICS_WRITE: ("write", "analytics"),
+        Permission.POLICIES_MANAGE: ("manage", "policies"),
+    }
+
+    for role, permissions in ROLE_PERMISSIONS.items():
+        expected_actions = {
+            permission_to_action[permission] for permission in permissions
+        }
+
+        assert PolicyEngine.ROLE_ACTIONS[role] == expected_actions
