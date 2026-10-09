@@ -4,7 +4,7 @@ from prometheus_client import make_asgi_app
 from app.config import settings
 from app.middleware import audit_middleware
 from app.routes.auth import router as auth_router
-
+from app.routes.documents import router as documents_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -41,7 +41,7 @@ app.middleware("http")(audit_middleware)
 
 # Authentication and protected API routes
 app.include_router(auth_router)
-
+app.include_router(documents_router)
 
 # Prometheus metrics endpoint
 metrics_app = make_asgi_app()
