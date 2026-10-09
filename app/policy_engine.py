@@ -1,36 +1,86 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 
-@dataclass
+@dataclass(frozen=True)
 class PolicyRequest:
-    subject: dict
+    subject: dict[str, Any]
     action: str
     resource: str
-    context: dict
+    context: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(frozen=True)
 class PolicyDecision:
     allowed: bool
     reason: str
 
 
 class PolicyEngine:
+    """Evaluate access requests using explicit, default-deny policies."""
+
+    ROLE_ACTIONS = {
+        "analyst": {
+            ("read", "analytics"),
+        },
+        "user": set(),
+        "admin": {
+            ("read", "analytics"),
+            ("write", "analytics"),
+            ("read", "users"),
+            ("write", "users"),
+        },
+    }
+
+    SENSITIVITY_LEVELS = {
+        "public": 0,
+        "internal": 1,
+        "confidential": 2,
+        "restricted": 3,
+    }
+
     def evaluate(self, request: PolicyRequest) -> PolicyDecision:
+        subject = request.subject
+        context = request.context
 
-        role = request.subject.get("role")
+        role = subject.get("role")
+        subject_id = subject.get("id")
 
-        if (
-            role == "analyst"
-            and request.action == "read"
-            and request.resource == "analytics"
-        ):
-            return PolicyDecision(
-                allowed=True,
-                reason="Analyst is allowed to read analytics",
-            )
+        if not role or role not in self.ROLE_ACTIONS:
+            return PolicyDecision(False, "Unknown or missing subject role")
 
-        return PolicyDecision(
-            allowed=False,
-            reason="Policy denied the requested action",
-        )
+        if not request.action or not request.resource:
+            return PolicyDecision(False, "Action and resource are required")
+
+        allowed_actions = self.ROLE_ACTIONS[role]
+
+        if (request.action, request.resource) not in allowed_actions:
+            return PolicyDecision(False, "Role is not permitted to perform this action")
+
+        # Resource ownership is checked when the policy declares
+        # that ownership is required.
+        if context.get("require_owner", False):
+            owner_id = context.get("resource_owner_id")
+
+            if subject_id is None or owner_id is None:
+                return PolicyDecision(False, "Ownership attributes are required")
+
+            if str(subject_id) != str(owner_id):
+                return PolicyDecision(False, "Resource ownership check failed")
+
+        # Sensitivity checks are enforced when a resource declares
+        # its classification.
+        sensitivity = context.get("resource_sensitivity")
+
+        if sensitivity is not None:
+            required_level = self.SENSITIVITY_LEVELS.get(sensitivity)
+            clearance = subject.get("clearance")
+            clearance_level = self.SENSITIVITY_LEVELS.get(clearance)
+
+            if required_level is None or clearance_level is None:
+                return PolicyDecision(False, "Unknown sensitivity or clearance level")
+
+            if clearance_level < required_level:
+                return PolicyDecision(False, "Insufficient clearance")
+
+        return PolicyDecision(True, "Policy explicitly permits the action")

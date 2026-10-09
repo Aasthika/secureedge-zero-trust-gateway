@@ -146,12 +146,18 @@ def require_policy(
     def policy_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
+        # Identity attributes come from the authenticated database user,
+        # not from request-body or query-string values.
+        subject = {
+            "id": current_user.id,
+            "username": current_user.username,
+            "role": current_user.role,
+        }
+
+        # Resource attributes must be supplied by trusted server-side
+        # code when a particular resource requires ownership or clearance.
         policy_request = PolicyRequest(
-            subject={
-                "id": current_user.id,
-                "username": current_user.username,
-                "role": current_user.role,
-            },
+            subject=subject,
             action=action,
             resource=resource,
             context={},

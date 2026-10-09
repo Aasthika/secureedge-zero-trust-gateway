@@ -82,7 +82,10 @@ def test_normal_user_cannot_write_users(authenticated_client):
 
 
 def test_rate_limit_blocks_after_five_requests():
-    username = "rate_limit_user"
+    from uuid import uuid4
+
+    username = f"rate_limit_{uuid4().hex[:12]}"
+    email = f"{username}@example.com"
     password = "SecurePassword123!"
 
     # Register user
@@ -90,7 +93,7 @@ def test_rate_limit_blocks_after_five_requests():
         "/auth/register",
         json={
             "username": username,
-            "email": "rate_limit_user@example.com",
+            "email": email,
             "password": password,
         },
     )
@@ -224,3 +227,33 @@ def test_unauthenticated_request_creates_deny_audit_log():
 
     finally:
         db.close()
+
+
+def test_me_response_does_not_expose_password_hash(authenticated_client):
+    response = authenticated_client.get("/auth/me")
+
+    assert response.status_code == 200
+
+    profile = response.json()
+    assert "id" in profile
+    assert "username" in profile
+    assert "email" in profile
+    assert "role" in profile
+
+    assert "password_hash" not in profile
+    assert "password" not in profile
+
+
+def test_me_ignores_caller_supplied_user_id(authenticated_client):
+    # /auth/me must identify the user from the validated JWT,
+    # not from a user ID supplied as a query parameter.
+    response = authenticated_client.get("/auth/me?user_id=999999999")
+
+    assert response.status_code == 200
+    assert response.json()["id"] != 999999999
+
+
+def test_me_rejects_missing_authorization_header():
+    response = client.get("/auth/me")
+
+    assert response.status_code == 401
