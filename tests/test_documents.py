@@ -193,10 +193,26 @@ def test_user_cannot_update_another_users_document(client):
     assert owner_read_response.json()["title"] == "Test document"
 
 
-def test_owner_can_delete_document(client):
+def test_admin_can_delete_document(client):
     headers = register_and_login(client)
-    create_response = create_document(client, headers)
 
+    from sqlalchemy import select
+    from app.database import SessionLocal
+    from app.models import User
+
+    me_response = client.get("/auth/me", headers=headers)
+    assert me_response.status_code == 200
+    user_id = me_response.json()["id"]
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.id == user_id))
+        assert user is not None
+        user.role = "admin"
+        db.commit()
+
+    # Log in again so the request uses the current database role.
+    # The application reads the role from the database on each request.
+    create_response = create_document(client, headers)
     assert create_response.status_code == 201
     document_id = create_response.json()["id"]
 
@@ -227,7 +243,7 @@ def test_user_cannot_delete_another_users_document(client):
         headers=other_headers,
     )
 
-    assert delete_response.status_code == 404
+    assert delete_response.status_code == 403
 
     owner_read_response = client.get(
         f"/documents/{document_id}",

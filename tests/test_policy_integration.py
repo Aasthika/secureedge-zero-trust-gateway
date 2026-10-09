@@ -145,7 +145,7 @@ def test_document_routes_reject_policy_denial(
             },
             "write",
         ),
-        ("delete", None, "write"),
+        ("delete", None, "delete"),
     ],
 )
 def test_individual_document_routes_reject_policy_denial(
