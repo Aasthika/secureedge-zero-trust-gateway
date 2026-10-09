@@ -20,16 +20,17 @@ class PolicyEngine:
     """Evaluate access requests using explicit, default-deny policies."""
 
     ROLE_ACTIONS = {
-        "analyst": {
-            ("read", "analytics"),
-        },
-        "user": set(),
         "admin": {
             ("read", "analytics"),
             ("write", "analytics"),
             ("read", "users"),
             ("write", "users"),
+            ("manage", "policies"),
         },
+        "analyst": {
+            ("read", "analytics"),
+        },
+        "user": set(),
     }
 
     SENSITIVITY_LEVELS = {
@@ -46,30 +47,40 @@ class PolicyEngine:
         role = subject.get("role")
         subject_id = subject.get("id")
 
-        if not role or role not in self.ROLE_ACTIONS:
+        if not isinstance(role, str) or role not in self.ROLE_ACTIONS:
             return PolicyDecision(False, "Unknown or missing subject role")
 
-        if not request.action or not request.resource:
+        if (
+            not isinstance(request.action, str)
+            or not request.action
+            or not isinstance(request.resource, str)
+            or not request.resource
+        ):
             return PolicyDecision(False, "Action and resource are required")
 
         allowed_actions = self.ROLE_ACTIONS[role]
 
         if (request.action, request.resource) not in allowed_actions:
-            return PolicyDecision(False, "Role is not permitted to perform this action")
+            return PolicyDecision(
+                False,
+                "Role is not permitted to perform this action",
+            )
 
-        # Resource ownership is checked when the policy declares
-        # that ownership is required.
         if context.get("require_owner", False):
             owner_id = context.get("resource_owner_id")
 
             if subject_id is None or owner_id is None:
-                return PolicyDecision(False, "Ownership attributes are required")
+                return PolicyDecision(
+                    False,
+                    "Ownership attributes are required",
+                )
 
             if str(subject_id) != str(owner_id):
-                return PolicyDecision(False, "Resource ownership check failed")
+                return PolicyDecision(
+                    False,
+                    "Resource ownership check failed",
+                )
 
-        # Sensitivity checks are enforced when a resource declares
-        # its classification.
         sensitivity = context.get("resource_sensitivity")
 
         if sensitivity is not None:
@@ -78,7 +89,10 @@ class PolicyEngine:
             clearance_level = self.SENSITIVITY_LEVELS.get(clearance)
 
             if required_level is None or clearance_level is None:
-                return PolicyDecision(False, "Unknown sensitivity or clearance level")
+                return PolicyDecision(
+                    False,
+                    "Unknown sensitivity or clearance level",
+                )
 
             if clearance_level < required_level:
                 return PolicyDecision(False, "Insufficient clearance")
