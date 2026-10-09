@@ -112,6 +112,8 @@ def test_role_permissions_match_policy_engine():
         Permission.ANALYTICS_READ: ("read", "analytics"),
         Permission.ANALYTICS_WRITE: ("write", "analytics"),
         Permission.POLICIES_MANAGE: ("manage", "policies"),
+        Permission.DOCUMENTS_READ: ("read", "documents"),
+        Permission.DOCUMENTS_WRITE: ("write", "documents"),
     }
 
     for role, permissions in ROLE_PERMISSIONS.items():

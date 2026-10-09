@@ -7,6 +7,8 @@ class Permission(str, Enum):
     ANALYTICS_READ = "analytics:read"
     ANALYTICS_WRITE = "analytics:write"
     POLICIES_MANAGE = "policies:manage"
+    DOCUMENTS_READ = "documents:read"
+    DOCUMENTS_WRITE = "documents:write"
 
 
 ROLE_PERMISSIONS = {
@@ -16,9 +18,14 @@ ROLE_PERMISSIONS = {
         Permission.ANALYTICS_READ,
         Permission.ANALYTICS_WRITE,
         Permission.POLICIES_MANAGE,
+        Permission.DOCUMENTS_READ,
+        Permission.DOCUMENTS_WRITE,
     },
     "analyst": {
         Permission.ANALYTICS_READ,
     },
-    "user": set(),
+    "user": {
+        Permission.DOCUMENTS_READ,
+        Permission.DOCUMENTS_WRITE,
+    },
 }
