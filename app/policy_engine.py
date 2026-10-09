@@ -26,6 +26,7 @@ PERMISSION_ACTIONS = {
     Permission.POLICIES_MANAGE: ("manage", "policies"),
     Permission.DOCUMENTS_READ: ("read", "documents"),
     Permission.DOCUMENTS_WRITE: ("write", "documents"),
+    Permission.DOCUMENTS_DELETE: ("delete", "documents"),
 }
 
 

@@ -115,7 +115,7 @@ def update_document(
 def delete_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_policy("write", "documents")),
+    current_user: User = Depends(require_policy("delete", "documents")),
 ):
     document = get_owned_document(document_id, current_user, db)
 
