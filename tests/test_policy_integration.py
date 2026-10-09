@@ -4,6 +4,9 @@ from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.models import User
+from unittest.mock import patch
+
+from fastapi import HTTPException
 
 
 def register_and_login(client, role="user"):
@@ -79,3 +82,20 @@ def test_unauthenticated_user_cannot_read_analytics(client):
     response = client.get("/auth/analytics-test")
 
     assert response.status_code == 401
+
+
+def test_document_route_rejects_policy_denial(client):
+    headers = register_and_login(client)
+
+    with patch("app.dependencies.policy_engine.evaluate") as mock_evaluate:
+        mock_evaluate.return_value.allowed = False
+        mock_evaluate.return_value.reason = "Test policy denial"
+
+        response = client.get(
+            "/documents",
+            headers=headers,
+        )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Test policy denial"
+    mock_evaluate.assert_called_once()
