@@ -234,3 +234,26 @@ def test_user_cannot_delete_another_users_document(client):
         headers=owner_headers,
     )
     assert owner_read_response.status_code == 200
+
+
+def test_unknown_role_cannot_access_documents(client):
+    from sqlalchemy import select
+
+    from app.database import SessionLocal
+    from app.models import User
+
+    headers = register_and_login(client)
+
+    me_response = client.get("/auth/me", headers=headers)
+    assert me_response.status_code == 200
+    user_id = me_response.json()["id"]
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.id == user_id))
+        assert user is not None
+        user.role = "unknown_role"
+        db.commit()
+
+    response = client.get("/documents", headers=headers)
+
+    assert response.status_code == 403
