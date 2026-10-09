@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.authorization import Permission, ROLE_PERMISSIONS
+
 
 @dataclass(frozen=True)
 class PolicyRequest:
@@ -16,22 +18,25 @@ class PolicyDecision:
     reason: str
 
 
+PERMISSION_ACTIONS = {
+    Permission.USERS_READ: ("read", "users"),
+    Permission.USERS_WRITE: ("write", "users"),
+    Permission.ANALYTICS_READ: ("read", "analytics"),
+    Permission.ANALYTICS_WRITE: ("write", "analytics"),
+    Permission.POLICIES_MANAGE: ("manage", "policies"),
+}
+
+
+ROLE_ACTIONS = {
+    role: {PERMISSION_ACTIONS[permission] for permission in permissions}
+    for role, permissions in ROLE_PERMISSIONS.items()
+}
+
+
 class PolicyEngine:
     """Evaluate access requests using explicit, default-deny policies."""
 
-    ROLE_ACTIONS = {
-        "admin": {
-            ("read", "analytics"),
-            ("write", "analytics"),
-            ("read", "users"),
-            ("write", "users"),
-            ("manage", "policies"),
-        },
-        "analyst": {
-            ("read", "analytics"),
-        },
-        "user": set(),
-    }
+    ROLE_ACTIONS = ROLE_ACTIONS
 
     SENSITIVITY_LEVELS = {
         "public": 0,
@@ -48,7 +53,10 @@ class PolicyEngine:
         subject_id = subject.get("id")
 
         if not isinstance(role, str) or role not in self.ROLE_ACTIONS:
-            return PolicyDecision(False, "Unknown or missing subject role")
+            return PolicyDecision(
+                False,
+                "Unknown or missing subject role",
+            )
 
         if (
             not isinstance(request.action, str)
@@ -56,7 +64,10 @@ class PolicyEngine:
             or not isinstance(request.resource, str)
             or not request.resource
         ):
-            return PolicyDecision(False, "Action and resource are required")
+            return PolicyDecision(
+                False,
+                "Action and resource are required",
+            )
 
         allowed_actions = self.ROLE_ACTIONS[role]
 
@@ -95,6 +106,12 @@ class PolicyEngine:
                 )
 
             if clearance_level < required_level:
-                return PolicyDecision(False, "Insufficient clearance")
+                return PolicyDecision(
+                    False,
+                    "Insufficient clearance",
+                )
 
-        return PolicyDecision(True, "Policy explicitly permits the action")
+        return PolicyDecision(
+            True,
+            "Policy explicitly permits the action",
+        )
