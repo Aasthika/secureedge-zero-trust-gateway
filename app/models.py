@@ -1,5 +1,8 @@
-from sqlalchemy import String
+from sqlalchemy import DateTime, Integer, String
+
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from datetime import datetime, timezone
 
 
 class Base(DeclarativeBase):
@@ -29,4 +32,68 @@ class User(Base):
     role: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
+        default="user",
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    user_id: Mapped[int | None] = mapped_column(
+        nullable=True,
+    )
+
+    username: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    role: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    endpoint: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    method: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+    )
+
+    decision: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    status_code: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    ip_address: Mapped[str | None] = mapped_column(
+        String(45),
+        nullable=True,
+    )
+
+    latency_ms: Mapped[float | None] = mapped_column(
+        nullable=True,
+    )
+
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
