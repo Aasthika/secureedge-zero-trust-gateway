@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +40,25 @@ class Settings(BaseSettings):
             raise ValueError("Unsupported environment")
 
         return value
+
+    @model_validator(mode="after")
+    def validate_production_secret(self):
+        if self.environment == "production":
+            secret = self.secret_key.lower()
+
+            placeholders = (
+                "replace-this",
+                "change-me",
+                "your-",
+                "test-only",
+                "development-secret",
+                "example-secret",
+            )
+
+            if any(value in secret for value in placeholders):
+                raise ValueError("Production requires a securely generated secret key")
+
+        return self
 
 
 settings = Settings()

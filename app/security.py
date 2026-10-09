@@ -29,10 +29,12 @@ def verify_password(
 def create_access_token(
     subject: str,
 ) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
         "sub": subject,
+        "iat": now,
         "exp": expire,
     }
 

@@ -1,17 +1,38 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import SecureDocument, User
-from app.schemas import DocumentCreate, DocumentResponse
+from app.schemas import DocumentCreate, DocumentResponse, DocumentUpdate
 
 
 router = APIRouter(
     prefix="/documents",
     tags=["Secure Documents"],
 )
+
+
+def get_owned_document(
+    document_id: int,
+    current_user: User,
+    db: Session,
+) -> SecureDocument:
+    statement = select(SecureDocument).where(
+        SecureDocument.id == document_id,
+        SecureDocument.owner_id == current_user.id,
+    )
+
+    document = db.scalar(statement)
+
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    return document
 
 
 @router.post(
@@ -63,17 +84,42 @@ def get_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    statement = select(SecureDocument).where(
-        SecureDocument.id == document_id,
-        SecureDocument.owner_id == current_user.id,
-    )
+    return get_owned_document(document_id, current_user, db)
 
-    document = db.scalar(statement)
 
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+@router.put(
+    "/{document_id}",
+    response_model=DocumentResponse,
+)
+def update_document(
+    document_id: int,
+    document_data: DocumentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    document = get_owned_document(document_id, current_user, db)
+
+    document.title = document_data.title
+    document.content = document_data.content
+
+    db.commit()
+    db.refresh(document)
 
     return document
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    document = get_owned_document(document_id, current_user, db)
+
+    db.delete(document)
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

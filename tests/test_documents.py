@@ -143,3 +143,94 @@ def test_document_endpoints_require_authentication(client, method, path, payload
         response = getattr(client, method)(path, json=payload)
 
     assert response.status_code == 401
+
+
+def test_owner_can_update_document(client):
+    headers = register_and_login(client)
+    create_response = create_document(client, headers)
+
+    assert create_response.status_code == 201
+    document_id = create_response.json()["id"]
+
+    response = client.put(
+        f"/documents/{document_id}",
+        headers=headers,
+        json={
+            "title": "Updated document",
+            "content": "Updated confidential content",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["title"] == "Updated document"
+    assert response.json()["content"] == "Updated confidential content"
+
+
+def test_user_cannot_update_another_users_document(client):
+    owner_headers = register_and_login(client)
+    other_headers = register_and_login(client)
+
+    create_response = create_document(client, owner_headers)
+    assert create_response.status_code == 201
+    document_id = create_response.json()["id"]
+
+    response = client.put(
+        f"/documents/{document_id}",
+        headers=other_headers,
+        json={
+            "title": "Unauthorized update",
+            "content": "Changed by another user",
+        },
+    )
+
+    assert response.status_code == 404
+
+    owner_read_response = client.get(
+        f"/documents/{document_id}",
+        headers=owner_headers,
+    )
+    assert owner_read_response.status_code == 200
+    assert owner_read_response.json()["title"] == "Test document"
+
+
+def test_owner_can_delete_document(client):
+    headers = register_and_login(client)
+    create_response = create_document(client, headers)
+
+    assert create_response.status_code == 201
+    document_id = create_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/documents/{document_id}",
+        headers=headers,
+    )
+
+    assert delete_response.status_code == 204
+
+    read_response = client.get(
+        f"/documents/{document_id}",
+        headers=headers,
+    )
+    assert read_response.status_code == 404
+
+
+def test_user_cannot_delete_another_users_document(client):
+    owner_headers = register_and_login(client)
+    other_headers = register_and_login(client)
+
+    create_response = create_document(client, owner_headers)
+    assert create_response.status_code == 201
+    document_id = create_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/documents/{document_id}",
+        headers=other_headers,
+    )
+
+    assert delete_response.status_code == 404
+
+    owner_read_response = client.get(
+        f"/documents/{document_id}",
+        headers=owner_headers,
+    )
+    assert owner_read_response.status_code == 200

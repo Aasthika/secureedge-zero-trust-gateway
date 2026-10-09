@@ -4,6 +4,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 os.environ["SECRET_KEY"] = "secureedge-test-only-secret-key-not-for-production-123456"
 os.environ["ENVIRONMENT"] = "testing"
+os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,16 +12,24 @@ from fastapi.testclient import TestClient
 from app.database import engine
 from app.main import app
 from app.models import Base
+from app.redis_client import redis_client
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database():
+    # Clear only rate-limit keys from the dedicated test Redis database.
+    for key in redis_client.scan_iter(match="rate_limit:user:*"):
+        redis_client.delete(key)
+
+    # Recreate the test database.
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
     yield
 
+    # Clean up the test database after the test session.
     Base.metadata.drop_all(bind=engine)
+    redis_client.close()
 
 
 @pytest.fixture

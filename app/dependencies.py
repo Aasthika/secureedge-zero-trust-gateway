@@ -31,6 +31,9 @@ def get_current_user(
             token,
             settings.secret_key,
             algorithms=[ALGORITHM],
+            options={
+                "require": ["sub", "iat", "exp"],
+            },
         )
     except jwt.InvalidTokenError as exc:
         raise HTTPException(

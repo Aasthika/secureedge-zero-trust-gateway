@@ -45,3 +45,8 @@ class DocumentResponse(BaseModel):
     model_config = {
         "from_attributes": True,
     }
+
+
+class DocumentUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=10000)
