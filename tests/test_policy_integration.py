@@ -194,3 +194,29 @@ def test_individual_document_routes_reject_policy_denial(
     policy_request = mock_evaluate.call_args.args[0]
     assert policy_request.action == expected_action
     assert policy_request.resource == "documents"
+
+
+def test_role_demotion_takes_effect_without_new_login(client):
+    headers = register_and_login(client, role="admin")
+
+    initial_response = client.get(
+        "/auth/admin-test",
+        headers=headers,
+    )
+    assert initial_response.status_code == 200
+
+    me_response = client.get("/auth/me", headers=headers)
+    assert me_response.status_code == 200
+    user_id = me_response.json()["id"]
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.id == user_id))
+        assert user is not None
+        user.role = "user"
+        db.commit()
+
+    response = client.get(
+        "/auth/admin-test",
+        headers=headers,
+    )
+    assert response.status_code == 403
