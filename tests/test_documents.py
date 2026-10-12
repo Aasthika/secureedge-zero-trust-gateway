@@ -273,3 +273,31 @@ def test_unknown_role_cannot_access_documents(client):
     response = client.get("/documents", headers=headers)
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "payload"),
+    [
+        ("get", "/documents/1", None),
+        (
+            "put",
+            "/documents/1",
+            {"title": "Unauthorized", "content": "Test"},
+        ),
+        ("delete", "/documents/1", None),
+    ],
+)
+def test_individual_document_operations_require_authentication(
+    client,
+    method,
+    path,
+    payload,
+):
+    request_method = getattr(client, method)
+
+    if payload is None:
+        response = request_method(path)
+    else:
+        response = request_method(path, json=payload)
+
+    assert response.status_code == 401
