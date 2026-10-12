@@ -31,6 +31,7 @@ def test_signed_token_with_invalid_subject_is_rejected(client):
 
     assert response.status_code == 401
 
+
 def test_token_without_expiration_is_rejected(client):
     token = jwt.encode(
         {
@@ -84,3 +85,18 @@ def test_expired_token_is_rejected(client):
     )
 
     assert response.status_code == 401
+
+
+def test_registration_cannot_assign_admin_role(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "username": "role_escalation_test",
+            "email": "role_escalation_test@example.com",
+            "password": "SecurePassword123!",
+            "role": "admin",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["role"] == "user"
