@@ -8,6 +8,7 @@ from app.database import get_db
 from app.dependencies import (
     enforce_rate_limit,
     get_current_user,
+    login_ip_rate_limiter,
     login_rate_limiter,
     require_permission,
     require_policy,
@@ -82,29 +83,43 @@ def login_user(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    # Apply login rate limiting by client IP.
+    # Apply login rate limits by client IP and username.
     client_ip = request.client.host if request.client else "unknown"
-    key = f"rate_limit:login:{client_ip}:{user_data.username.strip().lower()}"
+    normalized_username = user_data.username.strip().lower()
+
+    ip_key = f"rate_limit:login:ip:{client_ip}"
+    username_key = f"rate_limit:login:user:{client_ip}:{normalized_username}"
 
     try:
-        allowed, count, ttl = login_rate_limiter.check(key)
+        # Check the IP-wide limit first.
+        ip_allowed, _, ip_ttl = login_ip_rate_limiter.check(ip_key)
+
+        if not ip_allowed:
+            retry_after = max(ip_ttl, 1)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many login attempts from this IP. Try again later.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        # Then check the IP-and-username limit.
+        user_allowed, _, user_ttl = login_rate_limiter.check(username_key)
+
+        if not user_allowed:
+            retry_after = max(user_ttl, 1)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many login attempts. Try again later.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
     except redis.exceptions.RedisError as exc:
-        # Fail closed if the rate-limiting service is unavailable.
+        # Fail closed if Redis is unavailable.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Login service is temporarily unavailable",
             headers={"Retry-After": "5"},
         ) from exc
-
-    if not allowed:
-        retry_after = max(ttl, 1)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Try again later.",
-            headers={"Retry-After": str(retry_after)},
-        )
-
-    # Continue with normal authentication.
     user = db.scalar(select(User).where(User.username == user_data.username))
 
     if not user:

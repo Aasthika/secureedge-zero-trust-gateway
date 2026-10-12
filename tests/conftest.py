@@ -17,9 +17,13 @@ from app.redis_client import redis_client
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database():
-    # Clear only rate-limit keys from the dedicated test Redis database.
-    for key in redis_client.scan_iter(match="rate_limit:user:*"):
-        redis_client.delete(key)
+    # Clear rate-limit keys from the dedicated test Redis database.
+    for pattern in (
+        "rate_limit:user:*",
+        "rate_limit:login:*",
+    ):
+        for key in redis_client.scan_iter(match=pattern):
+            redis_client.delete(key)
 
     # Recreate the test database.
     Base.metadata.drop_all(bind=engine)
@@ -30,6 +34,19 @@ def setup_test_database():
     # Clean up the test database after the test session.
     Base.metadata.drop_all(bind=engine)
     redis_client.close()
+
+
+@pytest.fixture(autouse=True)
+def reset_login_rate_limits():
+    """Prevent login rate-limit state leaking between tests."""
+    yield
+
+    for pattern in (
+        "rate_limit:login:ip:*",
+        "rate_limit:login:user:*",
+    ):
+        for key in redis_client.scan_iter(match=pattern):
+            redis_client.delete(key)
 
 
 @pytest.fixture

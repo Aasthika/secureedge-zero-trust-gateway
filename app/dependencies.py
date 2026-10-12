@@ -110,6 +110,11 @@ login_rate_limiter = RateLimiter(
     window_seconds=60,
 )
 
+login_ip_rate_limiter = RateLimiter(
+    limit=30,
+    window_seconds=60,
+)
+
 
 def enforce_rate_limit(
     current_user: User = Depends(get_current_user),
