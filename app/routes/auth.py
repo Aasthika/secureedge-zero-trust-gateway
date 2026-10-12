@@ -1,8 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import redis
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.authorization import Permission
 from app.database import get_db
+from app.dependencies import (
+    enforce_rate_limit,
+    get_current_user,
+    login_rate_limiter,
+    require_permission,
+    require_policy,
+    require_role,
+)
 from app.models import User
 from app.schemas import (
     TokenResponse,
@@ -15,14 +25,6 @@ from app.security import (
     hash_password,
     verify_password,
 )
-from app.dependencies import (
-    enforce_rate_limit,
-    get_current_user,
-    require_permission,
-    require_role,
-    require_policy,
-)
-from app.authorization import Permission
 
 
 router = APIRouter(
@@ -77,8 +79,32 @@ def register_user(
 )
 def login_user(
     user_data: UserLogin,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    # Apply login rate limiting by client IP.
+    client_ip = request.client.host if request.client else "unknown"
+    key = f"rate_limit:login:{client_ip}:{user_data.username.strip().lower()}"
+
+    try:
+        allowed, count, ttl = login_rate_limiter.check(key)
+    except redis.exceptions.RedisError as exc:
+        # Fail closed if the rate-limiting service is unavailable.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Login service is temporarily unavailable",
+            headers={"Retry-After": "5"},
+        ) from exc
+
+    if not allowed:
+        retry_after = max(ttl, 1)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    # Continue with normal authentication.
     user = db.scalar(select(User).where(User.username == user_data.username))
 
     if not user:
@@ -136,7 +162,10 @@ def write_test(
     return current_user
 
 
-@router.get("/rate-limit-test", response_model=UserResponse)
+@router.get(
+    "/rate-limit-test",
+    response_model=UserResponse,
+)
 def rate_limit_test(
     current_user: User = Depends(enforce_rate_limit),
 ):
