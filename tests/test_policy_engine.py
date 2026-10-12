@@ -193,3 +193,9 @@ def test_role_permissions_match_policy_engine():
         }
 
         assert PolicyEngine.ROLE_ACTIONS[role] == expected_actions
+
+
+def test_every_permission_has_a_policy_action_mapping():
+    from app.policy_engine import PERMISSION_ACTIONS
+
+    assert set(PERMISSION_ACTIONS.keys()) == set(Permission)
