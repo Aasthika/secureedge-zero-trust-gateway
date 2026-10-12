@@ -218,3 +218,37 @@ def test_malformed_context_is_denied(engine, context):
         )
     )
     assert decision.allowed is False
+
+
+@pytest.mark.parametrize(
+    ("action", "resource"),
+    [
+        (None, "analytics"),
+        ("", "analytics"),
+        ("read", None),
+        ("read", ""),
+        (123, "analytics"),
+        ("read", 123),
+    ],
+)
+def test_invalid_action_or_resource_is_denied(engine, action, resource):
+    decision = evaluate(
+        engine,
+        {"id": 1, "role": "analyst"},
+        action=action,
+        resource=resource,
+    )
+    assert decision.allowed is False
+
+
+@pytest.mark.parametrize("require_owner", ["yes", 1, [], {}])
+def test_invalid_require_owner_flag_is_denied(engine, require_owner):
+    decision = engine.evaluate(
+        PolicyRequest(
+            subject={"id": 1, "role": "analyst"},
+            action="read",
+            resource="analytics",
+            context={"require_owner": require_owner},
+        )
+    )
+    assert decision.allowed is False

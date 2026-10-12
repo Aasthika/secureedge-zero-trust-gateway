@@ -92,7 +92,15 @@ class PolicyEngine:
                 "Role is not permitted to perform this action",
             )
 
-        if context.get("require_owner", False):
+        require_owner = context.get("require_owner", False)
+
+        if not isinstance(require_owner, bool):
+            return PolicyDecision(
+                False,
+                "Invalid ownership requirement",
+            )
+
+        if require_owner:
             owner_id = context.get("resource_owner_id")
 
             if subject_id is None or owner_id is None:
