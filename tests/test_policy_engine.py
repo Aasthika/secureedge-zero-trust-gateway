@@ -252,3 +252,36 @@ def test_invalid_require_owner_flag_is_denied(engine, require_owner):
         )
     )
     assert decision.allowed is False
+
+
+def test_ownership_denies_missing_subject_id(engine):
+    decision = evaluate(
+        engine,
+        {"role": "analyst"},
+        context={
+            "require_owner": True,
+            "resource_owner_id": 10,
+        },
+    )
+    assert decision.allowed is False
+
+
+def test_ownership_allows_matching_ids_with_different_types(engine):
+    decision = evaluate(
+        engine,
+        {"id": 10, "role": "analyst"},
+        context={
+            "require_owner": True,
+            "resource_owner_id": "10",
+        },
+    )
+    assert decision.allowed is True
+
+
+def test_sensitivity_denies_missing_resource_sensitivity_clearance(engine):
+    decision = evaluate(
+        engine,
+        {"id": 10, "role": "analyst"},
+        context={"resource_sensitivity": "confidential"},
+    )
+    assert decision.allowed is False
