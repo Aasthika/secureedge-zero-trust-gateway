@@ -199,3 +199,22 @@ def test_every_permission_has_a_policy_action_mapping():
     from app.policy_engine import PERMISSION_ACTIONS
 
     assert set(PERMISSION_ACTIONS.keys()) == set(Permission)
+
+
+@pytest.mark.parametrize("subject", [None, [], "invalid", 123])
+def test_malformed_subject_is_denied(engine, subject):
+    decision = evaluate(engine, subject)
+    assert decision.allowed is False
+
+
+@pytest.mark.parametrize("context", [None, [], "invalid", 123])
+def test_malformed_context_is_denied(engine, context):
+    decision = engine.evaluate(
+        PolicyRequest(
+            subject={"id": 1, "role": "analyst"},
+            action="read",
+            resource="analytics",
+            context=context,
+        )
+    )
+    assert decision.allowed is False

@@ -52,6 +52,18 @@ class PolicyEngine:
         subject = request.subject
         context = request.context
 
+        if not isinstance(subject, dict):
+            return PolicyDecision(
+                False,
+                "Invalid subject attributes",
+            )
+
+        if not isinstance(context, dict):
+            return PolicyDecision(
+                False,
+                "Invalid policy context",
+            )
+
         role = subject.get("role")
         subject_id = subject.get("id")
 
