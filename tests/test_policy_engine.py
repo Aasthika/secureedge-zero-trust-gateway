@@ -285,3 +285,19 @@ def test_sensitivity_denies_missing_resource_sensitivity_clearance(engine):
         context={"resource_sensitivity": "confidential"},
     )
     assert decision.allowed is False
+
+
+from app.authorization import Permission, ROLE_PERMISSIONS
+
+
+def test_role_permission_matrix_is_complete():
+    expected_permissions = {
+        "admin": set(Permission),
+        "analyst": {Permission.ANALYTICS_READ},
+        "user": {
+            Permission.DOCUMENTS_READ,
+            Permission.DOCUMENTS_WRITE,
+        },
+    }
+
+    assert ROLE_PERMISSIONS == expected_permissions
